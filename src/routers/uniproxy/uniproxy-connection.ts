@@ -307,12 +307,13 @@ export class UniProxyConnection {
       return
     }
 
-    const closeReason = clientMessage.StreamControl!.Close?.Reason
-    if (!closeReason) {
+    const close = clientMessage.StreamControl!.Close
+    if (!close) {
       return
     }
 
-    switch (closeReason) {
+    // Reason OK is 0: a regular end of speech must finish the input, not be skipped as "no reason"
+    switch (close.Reason) {
       case proto.NAlice.NAliceApi.TStreamControl.TActionClose.EReason.CANCEL: {
         this.handleClientCancel()
         break
