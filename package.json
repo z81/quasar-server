@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@bksp/style-guide": "^1.5.0",
-    "@discordjs/opus": "^0.10.0",
     "@elysia/openapi": "^1.4.15",
     "@elysiajs/node": "^1.4.5",
     "@sentry/node": "^10.52.0",

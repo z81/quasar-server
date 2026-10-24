@@ -1,5 +1,8 @@
 allowBuilds:
   '@bufbuild/buf': true
-  '@discordjs/opus': true
   esbuild: true
   protobufjs: true
+onlyBuiltDependencies:
+  - '@bufbuild/buf'
+  - esbuild
+  - protobufjs

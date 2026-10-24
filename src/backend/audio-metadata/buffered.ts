@@ -1,6 +1,6 @@
 import { Span, startInactiveSpan } from '@sentry/node'
 
-import { OpusProcessor } from '../../codecs/opus-processor'
+import { decodeOggOpusToPcm, FFMPEG_OPUS_DECODE_SAMPLE_RATE } from '../../codecs/opus-transcoder'
 import { getLogger } from '../../logger'
 import { AudioMetadataBackend, AudioMetadataBackendSession } from '../backend'
 
@@ -8,34 +8,33 @@ class BufferedAudioMetadataBackendSession extends AudioMetadataBackendSession {
   private readonly buffers: Buffer[] = []
 
   private readonly logger = getLogger()
-  private readonly opusProcessor: OpusProcessor
-  private sampleRate: null | number = null
 
   constructor (private readonly backendUrls: string[], private readonly parentSpan?: Span) {
     super()
-    this.opusProcessor = new OpusProcessor(async audioData => {
-      this.buffers.push(audioData)
-    }, async sampleRate => {
-      if (this.sampleRate != null && this.sampleRate !== sampleRate) {
-        throw new Error('Sample rate already defined')
-      }
-      this.sampleRate = sampleRate
-    })
   }
 
   close (): void {}
 
   async finish (): Promise<object> {
-    if (this.sampleRate == null) {
+    if (this.buffers.length === 0) {
       return {}
     }
-    const totalBuffer = Buffer.concat(this.buffers)
+    const ogg = Buffer.concat(this.buffers)
+
+    let pcm: Buffer
+    try {
+      pcm = await decodeOggOpusToPcm(ogg)
+    } catch (error) {
+      this.logger.warn(`Failed to decode audio for metadata: ${error}`)
+      return {}
+    }
+
     const promises: Promise<object>[] = []
     for (const url of this.backendUrls) {
       promises.push((async () => {
         try {
           const realUrl = new URL(url)
-          realUrl.searchParams.set('sample_rate', this.sampleRate?.toString() ?? '')
+          realUrl.searchParams.set('sample_rate', FFMPEG_OPUS_DECODE_SAMPLE_RATE.toString())
           let span: Span | undefined
           if (this.parentSpan) {
             span = startInactiveSpan({
@@ -46,7 +45,7 @@ class BufferedAudioMetadataBackendSession extends AudioMetadataBackendSession {
           }
           try {
             const result = await fetch(realUrl.toString(), {
-              body: totalBuffer,
+              body: Uint8Array.from(pcm),
               headers: {
                 'content-type': 'application/octet-stream'
               },
@@ -78,7 +77,7 @@ class BufferedAudioMetadataBackendSession extends AudioMetadataBackendSession {
   }
 
   async processChunk (chunk: Buffer): Promise<void> {
-    await this.opusProcessor.handleAudioData(chunk)
+    this.buffers.push(chunk)
   }
 }
 

@@ -1,27 +1,45 @@
 import { spawn } from 'node:child_process'
 
-const FFMPEG_TRANSCODE_TIMEOUT_MS = 30_000
+const FFMPEG_TIMEOUT_MS = 30_000
 
 /**
  * Transcodes signed 16-bit little-endian mono PCM into a complete OGG/Opus
  * file via ffmpeg — the format the station expects for TTS responses
  */
 export function transcodePcmToOggOpus (pcm: Buffer, sampleRate: number): Promise<Buffer> {
+  return runFfmpeg([
+    '-f', 's16le',
+    '-ar', String(sampleRate),
+    '-ac', '1',
+    '-i', 'pipe:0',
+    '-c:a', 'libopus',
+    '-b:a', '32k',
+    '-vbr', 'on',
+    '-application', 'voip',
+    '-f', 'ogg',
+    'pipe:1'
+  ], pcm, 'transcode')
+}
+
+// ffmpeg's opus decoder always outputs 48 kHz
+export const FFMPEG_OPUS_DECODE_SAMPLE_RATE = 48_000
+
+/**
+ * Decodes an OGG/Opus stream into signed 16-bit little-endian mono PCM at
+ * 48 kHz via ffmpeg
+ */
+export function decodeOggOpusToPcm (ogg: Buffer): Promise<Buffer> {
+  return runFfmpeg([
+    '-i', 'pipe:0',
+    '-f', 's16le',
+    '-ac', '1',
+    'pipe:1'
+  ], ogg, 'decode')
+}
+
+function runFfmpeg (ffmpegArguments: string[], input: Buffer, operation: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', [
-      '-hide_banner',
-      '-loglevel', 'error',
-      '-f', 's16le',
-      '-ar', String(sampleRate),
-      '-ac', '1',
-      '-i', 'pipe:0',
-      '-c:a', 'libopus',
-      '-b:a', '32k',
-      '-vbr', 'on',
-      '-application', 'voip',
-      '-f', 'ogg',
-      'pipe:1'
-    ])
+    const ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', ...ffmpegArguments])
 
     const output: Buffer[] = []
     let stderr = ''
@@ -29,7 +47,7 @@ export function transcodePcmToOggOpus (pcm: Buffer, sampleRate: number): Promise
 
     const timeout = setTimeout(() => {
       ffmpeg.kill('SIGKILL')
-    }, FFMPEG_TRANSCODE_TIMEOUT_MS)
+    }, FFMPEG_TIMEOUT_MS)
 
     const fail = (error: Error): void => {
       if (settled) return
@@ -46,7 +64,7 @@ export function transcodePcmToOggOpus (pcm: Buffer, sampleRate: number): Promise
     })
     ffmpeg.on('error', (error: NodeJS.ErrnoException) => {
       fail(error.code === 'ENOENT'
-        ? new Error('ffmpeg is not installed, but it is required for TTS audio transcoding')
+        ? new Error(`ffmpeg is not installed, but it is required for audio ${operation} (${operation === 'transcode' ? 'TTS' : 'audio metadata'})`)
         : error)
     })
     ffmpeg.on('close', code => {
@@ -56,13 +74,13 @@ export function transcodePcmToOggOpus (pcm: Buffer, sampleRate: number): Promise
       if (code === 0) {
         resolve(Buffer.concat(output))
       } else {
-        reject(new Error(`ffmpeg transcode failed with code ${code}: ${stderr.trim()}`))
+        reject(new Error(`ffmpeg ${operation} failed with code ${code}: ${stderr.trim()}`))
       }
     })
 
     ffmpeg.stdin.on('error', error => {
-      fail(new Error(`Failed to write PCM to ffmpeg: ${String(error)}`))
+      fail(new Error(`Failed to write audio to ffmpeg: ${String(error)}`))
     })
-    ffmpeg.stdin.end(pcm)
+    ffmpeg.stdin.end(input)
   })
 }
