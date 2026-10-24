@@ -40,15 +40,16 @@ export function registerUniproxyAliceYandexNetRouter (parameters: UniProxyConnec
     }
 
     const connection = new UniProxyConnection(websocket, deviceId, parameters)
-    websocket.on('close', () => {
+    websocket.on('close', code => {
       set.delete(connection)
-      logger.warn('UniProxy WebSocket closed')
+      logger.warn(`UniProxy WebSocket ${connection.connectionId} closed with code ${code}, open for device: ${set.size}`)
     })
     websocket.on('error', error => {
       set.delete(connection)
-      logger.warn(`UniProxy WebSocket error: ${error}`)
+      logger.warn(`UniProxy WebSocket ${connection.connectionId} error: ${error}`)
     })
     set.add(connection)
+    logger.info(`UniProxy WebSocket ${connection.connectionId} opened, open for device: ${set.size}`)
   })
 
   return router

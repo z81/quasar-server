@@ -39,6 +39,8 @@ export interface UniProxyConnectionParameters {
 }
 
 export class UniProxyConnection {
+  readonly connectionId = randomUUID().slice(0, 8)
+
   private dialogId: null | string = null
   private dialogSpan: Span | undefined = undefined
 
@@ -51,6 +53,9 @@ export class UniProxyConnection {
   private lastOutputAudioStreamId: number = 1024
   private readonly logger = getLogger<UniProxyConnection>()
   private readonly sendLock = new Sema(1)
+  private readonly unknownAudioStreamIds = new Set<number>()
+  private voiceAudioBytes = 0
+  private voiceAudioChunks = 0
   private voiceInputHandler: VoiceInputHandler
   private voiceInputReferenceMessageId: string = ''
 
@@ -181,9 +186,15 @@ export class UniProxyConnection {
 
   private async handleAudioMessage (streamId: number, audioData: Buffer): Promise<void> {
     if (longEquals(streamId, this.voiceInputStreamId)) {
+      this.voiceAudioBytes += audioData.length
+      this.voiceAudioChunks++
       await this.voiceInputHandler.handleVoiceInputAudioEvent({
         buffer: audioData
       })
+    } else if (!this.unknownAudioStreamIds.has(streamId)) {
+      this.unknownAudioStreamIds.add(streamId)
+      this.logger.info(`Audio for unknown stream ${streamId} on connection ${this.connectionId} ` +
+        `(voice input stream: ${String(this.voiceInputStreamId)}), dropping it`)
     }
   }
 
@@ -490,6 +501,9 @@ export class UniProxyConnection {
     }
 
     this.voiceInputStreamId = eventHeader.StreamId!
+    this.voiceAudioBytes = 0
+    this.voiceAudioChunks = 0
+    this.logger.info(`Voice input stream ${String(this.voiceInputStreamId)} started on connection ${this.connectionId}`)
     this.voiceInputReferenceMessageId = eventHeader.MessageId!
     this.voiceInputReferenceRequestId = voiceInputHeader.RequestId!
     this.voiceInputReferenceSequenceNumber = voiceInputHeader.SequenceNumber!
@@ -516,7 +530,7 @@ export class UniProxyConnection {
       parentSpan: null
     })
 
-    this.logger.info(`Dialog ${this.dialogId} started`)
+    this.logger.info(`Dialog ${this.dialogId} started on connection ${this.connectionId}`)
   }
 
   private openSession (): void {
@@ -741,6 +755,8 @@ export class UniProxyConnection {
 
   private setupVoiceInputHandlers (): void {
     this.voiceInputHandler.on('finish', async event => {
+      this.logger.info(`Voice input stream ${String(this.voiceInputStreamId)} on connection ${this.connectionId} ` +
+        `finished: ${this.voiceAudioChunks} chunks, ${this.voiceAudioBytes} bytes`)
       this.voiceInputStreamId = -1
 
       try {

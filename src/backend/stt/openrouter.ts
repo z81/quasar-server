@@ -73,6 +73,7 @@ class OpenRouterSTTSession extends STTBackendSession {
   private async transcribe (audio: Buffer, signal?: AbortSignal): Promise<{ text: string }> {
     // the station streams Opus in OGG, which providers reject with 400; WAV is accepted everywhere
     const wav = await transcodeOggOpusToWav(audio)
+    this.logger.info({ audioSeconds: (wav.length - 44) / 32_000, event: 'openrouter_stt_request', oggBytes: audio.length })
     const response = await this.openAI.audio.transcriptions.create({
       file: new File([Uint8Array.from(wav)], 'audio.wav', { type: 'audio/wav' }),
       ...(this.parameters.language ? { language: this.parameters.language } : {}),
