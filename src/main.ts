@@ -10,9 +10,9 @@ import z from 'zod'
 import { BufferedAudioMetadataBackend } from './backend/audio-metadata/buffered'
 import { BasicMusicBackend } from './backend/music/basic'
 import { StubMusicBackend } from './backend/music/stub'
-import { BasicProcessorBackend } from './backend/processors/basic'
-import { GigaAMSTTBackend } from './backend/stt/gigaam'
-import { OpenAITTSBackend } from './backend/tts/openai'
+import { OpenRouterProcessorBackend } from './backend/processors/openrouter'
+import { OpenRouterSTTBackend } from './backend/stt/openrouter'
+import { OpenRouterTTSBackend } from './backend/tts/openrouter'
 import { getEnvironment } from './environment'
 import { getLogger } from './logger'
 import { MusicManager } from './music/manager'
@@ -91,20 +91,34 @@ registerStartupMobileYandexNetRouter(app)
 registerScbhYandexNetRouter(app)
 registerRpcAliceYandexNetRouter(app)
 
+const openRouterClient = new OpenAI({
+  apiKey: environment.OPENROUTER_API_KEY,
+  baseURL: environment.OPENROUTER_BASE_URL,
+  defaultHeaders: {
+    'X-Title': 'quasar-server'
+  }
+})
+
 const uniProxyRouter = registerUniproxyAliceYandexNetRouter({
   audioMetadata: new BufferedAudioMetadataBackend(environment.AUDIO_METADATA_URLS),
   musicManager: new MusicManager(environment.MUSIC_SERVICE_BASIC_URL
     ? new BasicMusicBackend(environment.MUSIC_SERVICE_BASIC_URL)
     : new StubMusicBackend()),
-  processor: new BasicProcessorBackend(environment.PROCESSOR_BASIC_URL),
-  stt: new GigaAMSTTBackend(environment.STT_GIGAAM_URL),
-  tts: new OpenAITTSBackend(new OpenAI({
-    apiKey: environment.TTS_OPENAI_API_KEY,
-    baseURL: environment.TTS_OPENAI_BASE_URL
-  }), {
-    model: environment.TTS_OPENAI_MODEL,
-    speed: environment.TTS_OPENAI_SPEED,
-    voice: environment.TTS_OPENAI_VOICE
+  processor: new OpenRouterProcessorBackend(openRouterClient, {
+    model: environment.OPENROUTER_PROCESSOR_MODEL,
+    systemPrompt: environment.OPENROUTER_PROCESSOR_SYSTEM_PROMPT
+  }),
+  stt: new OpenRouterSTTBackend(openRouterClient, {
+    language: environment.OPENROUTER_STT_LANGUAGE,
+    model: environment.OPENROUTER_STT_MODEL,
+    partialIntervalMs: environment.OPENROUTER_STT_PARTIAL_INTERVAL_MS
+  }),
+  tts: new OpenRouterTTSBackend(openRouterClient, {
+    instructions: environment.OPENROUTER_TTS_INSTRUCTIONS,
+    model: environment.OPENROUTER_TTS_MODEL,
+    pcmSampleRate: environment.OPENROUTER_TTS_PCM_SAMPLE_RATE,
+    speed: environment.OPENROUTER_TTS_SPEED,
+    voice: environment.OPENROUTER_TTS_VOICE
   })
 }, server)
 

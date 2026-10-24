@@ -186,8 +186,13 @@ export class VoiceInputHandler extends EventEmitter<VoiceInputHandlerEvents> {
       ...(await this.audioMetadataSession?.finish())
     }
     this.audioMetadataSession = null
-    this.sttSession?.close()
+    const sttSession = this.sttSession
     this.sttSession = null
+    const finalTranscription = await sttSession?.finish()
+    if (finalTranscription !== null && finalTranscription !== undefined) {
+      this.lastTranscribeResult = finalTranscription
+    }
+    sttSession?.close()
     this.audioDataQueue = []
     this.voiceSpan?.setAttribute('endReason', 'finish')
     this.voiceSpan?.setAttribute('text', this.lastTranscribeResult)

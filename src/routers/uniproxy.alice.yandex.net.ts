@@ -1,5 +1,5 @@
 import { Server } from 'node:http'
-import { Server as WSServer } from 'ws'
+import { WebSocketServer as WSServer } from 'ws'
 
 import { getLogger } from '../logger'
 import { UniProxyConnection, UniProxyConnectionParameters } from './uniproxy/uniproxy-connection'

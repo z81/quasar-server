@@ -74,6 +74,14 @@ export abstract class STTBackendSession {
 
   abstract close (): void
 
+  /**
+   * Waits for the final transcription of the whole utterance and returns its
+   * text, or null if the backend transcribes only in streaming fashion
+   */
+  finish (): Promise<null | string> {
+    return Promise.resolve(null)
+  }
+
   setCallback (callback: STTChunkTranscribeCallback): void {
     this.callback = callback
   }

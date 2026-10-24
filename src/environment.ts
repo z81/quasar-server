@@ -19,22 +19,28 @@ const environmentType = z.object({
 
   MUSIC_SERVICE_BASIC_URL: z.url().optional(),
 
+  OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY is required: STT, TTS and dialog processor all go through OpenRouter'),
+
+  OPENROUTER_BASE_URL: z.url().default('https://openrouter.ai/api/v1'),
+
+  OPENROUTER_PROCESSOR_MODEL: z.string().default('google/gemini-3.8-flash'),
+  OPENROUTER_PROCESSOR_SYSTEM_PROMPT: z.string().optional(),
+
+  OPENROUTER_STT_LANGUAGE: z.string().default('ru'),
+  OPENROUTER_STT_MODEL: z.string().default('openai/whisper-large-v3'),
+  OPENROUTER_STT_PARTIAL_INTERVAL_MS: z.string().default('0').transform(value => Number.parseInt(value)),
+
+  OPENROUTER_TTS_INSTRUCTIONS: z.string().optional(),
+  OPENROUTER_TTS_MODEL: z.string().default('google/gemini-3.8-flash-lite-tts'),
+  OPENROUTER_TTS_PCM_SAMPLE_RATE: z.string().default('24000').transform(value => Number.parseInt(value)),
+  OPENROUTER_TTS_SPEED: z.string().default('1').transform(Number),
+  OPENROUTER_TTS_VOICE: z.string().default('Kore'),
+
   PORT: z.string().default('31115').transform(value => Number.parseInt(value)),
 
   POSTGRES_URL: z.url().default('postgres://quasar:quasar@localhost/quasar'),
 
-  PROCESSOR_BASIC_URL: z.url().default('http://localhost:8080'),
-
   SENTRY_DSN: z.url().default('https://test@o0.ingest.sentry.io/0'),
-  STT_GIGAAM_URL: z.url().default('ws://10.0.3.137:8080'),
-  TTS_OPENAI_API_KEY: z.string().default(''),
-  TTS_OPENAI_BASE_URL: z.url().default('http://10.0.3.137:8000'),
-  TTS_OPENAI_MODEL: z.string().default(''),
-
-  TTS_OPENAI_SPEED: z.string().default('1').transform(Number),
-
-  TTS_OPENAI_VOICE: z.string().default('IVONA 2 Tatyana OEM'),
-
   UPDATES_CONFIG_PATH: z.string().optional()
 })
 
