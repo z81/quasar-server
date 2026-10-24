@@ -1,6 +1,7 @@
 import { Span, startInactiveSpan } from '@sentry/node'
 import { OpenAI } from 'openai'
 
+import { transcodeOggOpusToWav } from '../../codecs/opus-transcoder'
 import { getLogger } from '../../logger'
 import { STTBackend, STTBackendSession } from '../backend'
 
@@ -49,7 +50,11 @@ class OpenRouterSTTSession extends STTBackendSession {
       this.span?.end()
       return response.text
     } catch (error) {
-      this.logger.warn({ error: String(error), event: 'openrouter_stt_final_failed' })
+      this.logger.warn({
+        details: error instanceof OpenAI.APIError ? error.error : undefined,
+        error: String(error),
+        event: 'openrouter_stt_final_failed'
+      })
       this.span?.end()
       return null
     }
@@ -66,8 +71,10 @@ class OpenRouterSTTSession extends STTBackendSession {
   }
 
   private async transcribe (audio: Buffer, signal?: AbortSignal): Promise<{ text: string }> {
+    // the station streams Opus in OGG, which providers reject with 400; WAV is accepted everywhere
+    const wav = await transcodeOggOpusToWav(audio)
     const response = await this.openAI.audio.transcriptions.create({
-      file: new File([Uint8Array.from(audio)], 'audio.ogg', { type: 'audio/ogg' }),
+      file: new File([Uint8Array.from(wav)], 'audio.wav', { type: 'audio/wav' }),
       ...(this.parameters.language ? { language: this.parameters.language } : {}),
       model: this.parameters.model
     }, signal ? { signal } : {})

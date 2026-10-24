@@ -37,6 +37,37 @@ export function decodeOggOpusToPcm (ogg: Buffer): Promise<Buffer> {
   ], ogg, 'decode')
 }
 
+/**
+ * Transcodes an OGG/Opus stream into a 16-bit mono WAV file — the input every
+ * speech recognition provider accepts, unlike Opus in OGG. The header is built
+ * here because ffmpeg cannot fill in WAV sizes when writing to a pipe
+ */
+export async function transcodeOggOpusToWav (ogg: Buffer, sampleRate = 16_000): Promise<Buffer> {
+  const pcm = await runFfmpeg([
+    '-i', 'pipe:0',
+    '-f', 's16le',
+    '-ar', String(sampleRate),
+    '-ac', '1',
+    'pipe:1'
+  ], ogg, 'decode')
+
+  const header = Buffer.alloc(44)
+  header.write('RIFF', 0, 'ascii')
+  header.writeUInt32LE(36 + pcm.length, 4)
+  header.write('WAVE', 8, 'ascii')
+  header.write('fmt ', 12, 'ascii')
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(1, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(sampleRate * 2, 28)
+  header.writeUInt16LE(2, 32)
+  header.writeUInt16LE(16, 34)
+  header.write('data', 36, 'ascii')
+  header.writeUInt32LE(pcm.length, 40)
+  return Buffer.concat([header, pcm])
+}
+
 function runFfmpeg (ffmpegArguments: string[], input: Buffer, operation: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', ...ffmpegArguments])
