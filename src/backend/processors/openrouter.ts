@@ -19,6 +19,8 @@ const DEFAULT_SYSTEM_PROMPT = `Ты — голосовой ассистент у
 
 const ERROR_RESPONSE_TEXT = 'Извините, что-то пошло не так. Попробуйте спросить ещё раз.'
 
+const TURN_TIMEOUT_MS = 30_000
+
 interface OpenRouterProcessorBackendParameters {
   model: string;
   systemPrompt?: string;
@@ -76,7 +78,8 @@ export class OpenRouterProcessorSession extends EventEmitter<ProcessorSessionEve
       .catch(error => {
         this.logger.warn({ error: String(error), event: 'openrouter_processor_turn_failed' })
       })
-    return this.turnQueue
+    // the answer streams in via partialResponse events, callers must not wait for the whole turn
+    return Promise.resolve()
   }
 
   private buildTools (): ChatCompletionTool[] {
@@ -115,6 +118,9 @@ export class OpenRouterProcessorSession extends EventEmitter<ProcessorSessionEve
 
     const abortController = new AbortController()
     this.currentAbortController = abortController
+    const turnTimeout = setTimeout(() => {
+      abortController.abort()
+    }, TURN_TIMEOUT_MS)
 
     this.messages.push({
       content: buildUserContent(request),
@@ -188,6 +194,7 @@ export class OpenRouterProcessorSession extends EventEmitter<ProcessorSessionEve
       this.logger.warn({ error: String(error), event: 'openrouter_processor_stream_failed' })
       this.emitPartial(ERROR_RESPONSE_TEXT, [], true)
     } finally {
+      clearTimeout(turnTimeout)
       if (this.currentAbortController === abortController) {
         this.currentAbortController = null
       }

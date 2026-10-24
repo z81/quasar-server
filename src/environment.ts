@@ -30,6 +30,8 @@ const environmentType = z.object({
   OPENROUTER_STT_MODEL: z.string().default('openai/whisper-large-v3'),
   OPENROUTER_STT_PARTIAL_INTERVAL_MS: z.string().default('0').transform(value => Number.parseInt(value)),
 
+  OPENROUTER_TIMEOUT_MS: z.string().default('10000').transform(value => Number.parseInt(value)),
+
   OPENROUTER_TTS_INSTRUCTIONS: z.string().optional(),
   OPENROUTER_TTS_MODEL: z.string().default('google/gemini-3.8-flash-lite-tts'),
   OPENROUTER_TTS_PCM_SAMPLE_RATE: z.string().default('24000').transform(value => Number.parseInt(value)),

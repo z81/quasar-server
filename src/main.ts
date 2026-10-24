@@ -96,7 +96,9 @@ const openRouterClient = new OpenAI({
   baseURL: environment.OPENROUTER_BASE_URL,
   defaultHeaders: {
     'X-Title': 'quasar-server'
-  }
+  },
+  maxRetries: 0,
+  timeout: environment.OPENROUTER_TIMEOUT_MS
 })
 
 const uniProxyRouter = registerUniproxyAliceYandexNetRouter({
