@@ -145,10 +145,10 @@ export class OpenRouterProcessorSession extends EventEmitter<ProcessorSessionEve
         if (!delta) continue
         if (delta.content) {
           text += delta.content
-          const sentenceEnd = findSentenceEnd(text)
-          if (sentenceEnd > emittedLength) {
-            this.emitPartial(text.slice(emittedLength, sentenceEnd), [], false)
-            emittedLength = sentenceEnd
+          const partialCut = findPartialCut(text, emittedLength)
+          if (partialCut > emittedLength) {
+            this.emitPartial(text.slice(emittedLength, partialCut), [], false)
+            emittedLength = partialCut
           }
         }
         for (const toolCall of delta.tool_calls ?? []) {
@@ -219,10 +219,25 @@ function buildUserContent (request: ProcessorRequest): string {
   return `[Контекст: ${context.join('; ')}]\n${prefix}${request.text}`
 }
 
-function findSentenceEnd (text: string): number {
+// clause-level cuts are only taken when this many new characters have piled up, so short
+// lead-ins like «Конечно,» do not turn into separate one-word TTS requests
+const MIN_CLAUSE_CHARS = 30
+
+function findPartialCut (text: string, emittedLength: number): number {
   let end = -1
   for (const separator of ['.', '!', '?', '…', '\n']) {
     end = Math.max(end, text.lastIndexOf(separator))
+  }
+  if (end >= 0) {
+    return end + 1
+  }
+  for (const separator of [',', ':', ';']) {
+    const index = text.lastIndexOf(separator)
+    if (index === -1 || index + 1 - emittedLength < MIN_CLAUSE_CHARS) continue
+    const isDecimalSeparator = /\d/.test(text[index - 1] ?? '') && /\d/.test(text[index + 1] ?? '')
+    if (!isDecimalSeparator) {
+      end = Math.max(end, index)
+    }
   }
   return end === -1 ? 0 : end + 1
 }

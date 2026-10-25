@@ -39,6 +39,7 @@ export interface STTChunkTranscribeResult {
 
 export interface TTSBackend {
   synthesize(request: TTSRequest): Promise<TTSResponse>;
+  synthesizeStream?(request: TTSRequest): Promise<TTSStreamResponse>;
 }
 
 export interface TTSRequest {
@@ -49,6 +50,11 @@ export interface TTSRequest {
 export interface TTSResponse {
   format: string;
   voiceOutput: Buffer;
+}
+
+export interface TTSStreamResponse {
+  chunks: AsyncIterable<Buffer> | Iterable<Buffer>;
+  format: string;
 }
 
 export abstract class AudioMetadataBackendSession {

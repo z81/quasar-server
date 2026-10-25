@@ -36,6 +36,7 @@ export interface UniProxyConnectionParameters {
   processor: ProcessorBackend
   stt: STTBackend
   tts: TTSBackend
+  ttsStreaming: boolean
 }
 
 export class UniProxyConnection {
@@ -657,28 +658,30 @@ export class UniProxyConnection {
         })
       }
 
-      let audioData: Buffer = Buffer.from([])
       try {
-        if (result.text !== '') {
+        if (result.text === '') {
+          await this.sendTTS([], referenceMessageId)
+          return
+        }
+
+        if (this.parameters.ttsStreaming && this.parameters.tts.synthesizeStream) {
+          const stream = await this.parameters.tts.synthesizeStream({
+            parentSpan: span ?? this.inputSpan ?? this.dialogSpan,
+            text: result.text
+          })
+          await this.sendTTS(stream.chunks, referenceMessageId)
+        } else {
           const ttsResult = await this.parameters.tts.synthesize({
             parentSpan: span ?? this.inputSpan ?? this.dialogSpan,
             text: result.text
           })
-          audioData = ttsResult.voiceOutput
+          span?.end()
+          await this.sendTTS([ttsResult.voiceOutput], referenceMessageId)
         }
       } catch (error) {
         this.logger.error('Failed to synthesize TTS: ', error)
-      }
-
-      span?.end()
-
-      this.logger.info(`Synthesized: ${audioData.length}`)
-
-      try {
-        await this.sendTTS(audioData, referenceMessageId)
-      } catch (error) {
-        this.logger.error('Failed to send TtsSpeak in sendInputResult: ', error)
-        this.closeConnection()
+        span?.end()
+        await this.sendTTS([], referenceMessageId)
       }
     }
   }
@@ -726,31 +729,45 @@ export class UniProxyConnection {
     await this.sendRawData(Buffer.concat([Buffer.from('AAPI', 'ascii'), encoded]), true)
   }
 
-  private async sendTTS (audioData: Buffer, referenceMessageId: string): Promise<void> {
+  private async sendTTS (audioChunks: AsyncIterable<Buffer> | Iterable<Buffer>,
+    referenceMessageId: string): Promise<void> {
     this.lastOutputAudioStreamId++
-    await this.sendServerMessage({
-      Event: {
-        Header: {
-          MessageId: randomUUID(),
-          RefMessageId: referenceMessageId,
-          StreamId: this.lastOutputAudioStreamId
+    let streamAnnounced = false
+    try {
+      await this.sendServerMessage({
+        Event: {
+          Header: {
+            MessageId: randomUUID(),
+            RefMessageId: referenceMessageId,
+            StreamId: this.lastOutputAudioStreamId
+          },
+          TtsSpeak: {
+            Format: 'audio/opus',
+            // the audio below is one continuous OGG stream delivered in chunks as it is synthesized
+            LazyTtsStreaming: true,
+          }
         },
-        TtsSpeak: {
-          Format: 'audio/opus',
-          LazyTtsStreaming: false,
-        }
-      },
-      Timings: this.getTimings()
-    })
-    await this.sendAudioDataMessage(this.lastOutputAudioStreamId, audioData)
-    await this.sendServerMessage({
-      StreamControl: {
-        Close: {},
-        MessageId: randomUUID(),
-        StreamId: this.lastOutputAudioStreamId
-      },
-      Timings: this.getTimings()
-    })
+        Timings: this.getTimings()
+      })
+      streamAnnounced = true
+      let sentBytes = 0
+      for await (const chunk of audioChunks) {
+        sentBytes += chunk.length
+        await this.sendAudioDataMessage(this.lastOutputAudioStreamId, chunk)
+      }
+      this.logger.info(`Sent TTS audio: ${sentBytes} bytes`)
+    } finally {
+      if (streamAnnounced) {
+        await this.sendServerMessage({
+          StreamControl: {
+            Close: {},
+            MessageId: randomUUID(),
+            StreamId: this.lastOutputAudioStreamId
+          },
+          Timings: this.getTimings()
+        })
+      }
+    }
   }
 
   private setupVoiceInputHandlers (): void {

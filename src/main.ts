@@ -121,7 +121,8 @@ const uniProxyRouter = registerUniproxyAliceYandexNetRouter({
     pcmSampleRate: environment.OPENROUTER_TTS_PCM_SAMPLE_RATE,
     speed: environment.OPENROUTER_TTS_SPEED,
     voice: environment.OPENROUTER_TTS_VOICE
-  })
+  }),
+  ttsStreaming: environment.OPENROUTER_TTS_STREAMING
 }, server)
 
 const apiServer = new Elysia({

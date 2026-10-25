@@ -40,6 +40,7 @@ OPENROUTER_API_KEY=sk-or-... pnpm start
 | `OPENROUTER_TTS_VOICE` | `Kore` | Голос (список — на странице модели на OpenRouter) |
 | `OPENROUTER_TTS_INSTRUCTIONS` | — | Стиль речи (поддерживается не всеми моделями) |
 | `OPENROUTER_TTS_SPEED` | `1` | Скорость речи |
+| `OPENROUTER_TTS_STREAMING` | `true` | Стриминговый TTS: аудио уходит на станцию по мере синтеза; `false` — старый режим «фраза целиком» |
 | `OPENROUTER_TTS_PCM_SAMPLE_RATE` | `24000` | Частота дискретизации PCM, которую отдаёт TTS-модель |
 | `OPENROUTER_PROCESSOR_MODEL` | `google/gemini-3.8-flash` | Модель «мозга» (chat completions; должны поддерживаться стриминг и tools) |
 | `OPENROUTER_PROCESSOR_SYSTEM_PROMPT` | встроенный | Системный промпт ассистента |
@@ -48,9 +49,9 @@ OPENROUTER_API_KEY=sk-or-... pnpm start
 
 ## Как это работает
 
-- **STT** — аудиопоток станции (OGG/Opus) отправляется в `POST /api/v1/audio/transcriptions` после конца фразы; текст уходит в процессор.
-- **Процессор** — стриминговый `chat/completions`: частичные ответы нарезаются по границам предложений и озвучиваются по мере генерации; управление колонкой (музыка, громкость, Bluetooth) — через tools, которые маппятся в директивы Quasar.
-- **TTS** — `POST /api/v1/audio/speech` (`response_format: pcm`), затем PCM транскодируется в OGG/Opus через ffmpeg и отправляется на станцию.
+- **STT** — аудиопоток станции (OGG/Opus) транскодируется в WAV и отправляется в `POST /api/v1/audio/transcriptions` после конца фразы; текст уходит в процессор. Потокового распознавания у OpenRouter нет, поэтому финальный текст появляется только после конца речи.
+- **Процессор** — стриминговый `chat/completions`: частичные ответы нарезаются по границам предложений и клауз (запятые) и озвучиваются по мере генерации; управление колонкой (музыка, громкость, Bluetooth) — через tools, которые маппятся в директивы Quasar.
+- **TTS** — `POST /api/v1/audio/speech` (`response_format: pcm`): PCM приходит потоком, транскодируется в OGG/Opus через ffmpeg на лету и чанками отправляется на станцию (`LazyTtsStreaming`) — колонка начинает говорить, не дожидаясь синтеза всей фразы.
 
 ## Лицензия
 

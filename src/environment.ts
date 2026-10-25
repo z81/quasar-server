@@ -36,6 +36,7 @@ const environmentType = z.object({
   OPENROUTER_TTS_MODEL: z.string().default('google/gemini-3.8-flash-lite-tts'),
   OPENROUTER_TTS_PCM_SAMPLE_RATE: z.string().default('24000').transform(value => Number.parseInt(value)),
   OPENROUTER_TTS_SPEED: z.string().default('1').transform(Number),
+  OPENROUTER_TTS_STREAMING: z.string().default('true').transform(value => value.toLowerCase().trim() === 'true'),
   OPENROUTER_TTS_VOICE: z.string().default('Kore'),
 
   PORT: z.string().default('31115').transform(value => Number.parseInt(value)),
