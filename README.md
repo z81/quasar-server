@@ -32,6 +32,7 @@ OPENROUTER_API_KEY=sk-or-... pnpm start
 | `POSTGRES_URL` | `postgres://quasar:quasar@localhost/quasar` | Строка подключения PostgreSQL |
 | `OPENROUTER_API_KEY` | — | **Обязательный.** Токен OpenRouter для STT, TTS и процессора |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Базовый URL OpenRouter-совместимого API |
+| `OPENROUTER_TIMEOUT_MS` | `10000` | Таймаут запроса к OpenRouter, без повторов (станция ждёт ответ ~15 с) |
 | `OPENROUTER_STT_MODEL` | `openai/whisper-large-v3` | Модель распознавания речи (`/audio/transcriptions`) |
 | `OPENROUTER_STT_LANGUAGE` | `ru` | Язык речи (ISO-639-1) |
 | `OPENROUTER_STT_PARTIAL_INTERVAL_MS` | `0` | Интервал промежуточных распознаваний (0 — выключено; каждая промежуточная = отдельный платный запрос) |
